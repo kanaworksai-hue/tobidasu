@@ -1,0 +1,4 @@
+.godot/
+*.import
+!addons/tobidasu/icon.svg.import
+.DS_Store
