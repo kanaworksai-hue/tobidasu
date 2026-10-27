@@ -1099,7 +1099,7 @@ func _emit_building(comp: Array[Vector2i], cells: Dictionary, li: int) -> void:
 		if ridge > 0.0 and rr > 0.0:
 			var plain := tile + Vector2(8.5, 6.5)
 			# (the roof's ridge over the wall line sits lower by the eaves' drop)
-			var top := Vector3(x, hw + ridge * (1.0 - 2.0 * ov / depth) - 0.004, cy0 + depth * 0.5)
+			var top := Vector3(x, hw + ridge - _eave_drop(ridge, ov, depth) - 0.004, cy0 + depth * 0.5)
 			var p3 := [Vector3(x, hw, cy0), top, top, Vector3(x, hw, cy1)]
 			_quad(src, _folded(p3, fy_wall, fold), p3,
 				[plain, plain, plain, plain],
@@ -1132,18 +1132,25 @@ func _emit_building(comp: Array[Vector2i], cells: Dictionary, li: int) -> void:
 				if (tp[0] as PackedByteArray)[k] != 0 and (tp[1] as PackedFloat32Array)[k] < best:
 					best = (tp[1] as PackedFloat32Array)[k]
 					dark = Vector2(rp) + Vector2(lx + 0.5, tile_px - 0.5)
-		# just below the lowest point of the eaves, or it pokes through the roof;
-		# out under the front and back eaves only (past the gable ends it read
-		# as a dark line across them)
-		var ys := hw - ridge * 2.0 * ov / depth - 0.01
+		# Flat just under the wall tops between the walls, then sloping down
+		# under the front and back eaves just beneath the roof (a flat plate at
+		# the eaves' lowest point cut through the top of the facade); out under
+		# the front and back eaves only (past the gable ends it read as a dark
+		# line across them).
+		var yw := hw - 0.01
+		var ye := hw - _eave_drop(ridge, ov, depth) - 0.01
 		var sx0 := cx0 + 0.002
 		var sx1 := cx1 - 0.002
 		var fl := fy_roof - FLAT_EPS * 0.5
+		var strips := [[cy0 - ov, ye, float(cy0), yw], [float(cy0), yw, float(cy1), yw], [float(cy1), yw, cy1 + ov, ye]]
 		for n in [Vector3.DOWN, Vector3.UP]:   # both sides: seen from above through gaps, and from below
-			_quad(src,
-				[Vector3(cx0, fl, cy0), Vector3(cx1, fl, cy0), Vector3(cx1, fl, cy0), Vector3(cx0, fl, cy0)],
-				[Vector3(sx0, ys, cy0 - ov), Vector3(sx1, ys, cy0 - ov), Vector3(sx1, ys, cy1 + ov), Vector3(sx0, ys, cy1 + ov)],
-				[dark, dark, dark, dark], n, 0.0, dl, 0.0, KIND_LID, lid_a, hw)
+			for sp in strips:
+				if absf(float(sp[2]) - float(sp[0])) < 1e-4:
+					continue
+				_quad(src,
+					[Vector3(cx0, fl, cy0), Vector3(cx1, fl, cy0), Vector3(cx1, fl, cy0), Vector3(cx0, fl, cy0)],
+					[Vector3(sx0, sp[1], sp[0]), Vector3(sx1, sp[1], sp[0]), Vector3(sx1, sp[3], sp[2]), Vector3(sx0, sp[3], sp[2])],
+					[dark, dark, dark, dark], n, 0.0, dl, 0.0, KIND_LID, lid_a, hw)
 		if recess > 0.0:
 			# the walkway's ceiling (the underside of the floor above); edge-on in 2D
 			var fz := float(cy1 - 1)
@@ -1212,8 +1219,15 @@ func _emit_cross_gable(c: Vector2i, u0: Vector2, apex: float, cy0: int, rr: floa
 func _roof_point(z: float, cy0: int, rr: float, depth: float, hw: float, ridge: float, ov: float) -> Vector2:
 	var u := (z - cy0) / rr
 	var z3 := cy0 - ov + u * (depth + 2.0 * ov)
-	var y := hw + ridge * (1.0 - absf(2.0 * u - 1.0)) - ridge * 2.0 * ov / depth
+	var y := hw + ridge * (1.0 - absf(2.0 * u - 1.0)) - _eave_drop(ridge, ov, depth)
 	return Vector2(z3, y)
+
+
+## How far the eaves hang below the wall tops: the roof plane passes a hair
+## above the front and back walls (a deeper drop let the top of the facade poke
+## through the roof just behind the eaves).
+static func _eave_drop(ridge: float, ov: float, depth: float) -> float:
+	return maxf(2.0 * ridge * ov / (depth + 2.0 * ov) - 0.006, 0.0)
 
 
 func _first_wall_tile(cells: Dictionary, comp: Array[Vector2i], cx: int, wall_top: int, cy1: int) -> Vector2:

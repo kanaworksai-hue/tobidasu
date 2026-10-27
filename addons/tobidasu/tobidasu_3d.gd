@@ -349,6 +349,7 @@ func _rebuild_cards() -> void:
 	_cards.clear()
 	if _card_mesh == null:
 		_card_mesh = _make_card_mesh()
+	var order := 0
 	for s in sprites:
 		if s == null or not (s is Sprite2D or s is AnimatedSprite2D):
 			continue
@@ -360,7 +361,10 @@ func _rebuild_cards() -> void:
 		m.set_shader_parameter(&"pop", pop)
 		m.set_shader_parameter(&"shade", shade)
 		m.set_shader_parameter(&"stable_pixels", stable_pixels)
-		m.set_shader_parameter(&"flat_y", _builder.flat_top + TobidasuBuilder.FLAT_EPS * 2.0)
+		# Lying flat, every card gets its own height in list order (later on top,
+		# like 2D draw order): two overlapping cards at one height would z-fight.
+		m.set_shader_parameter(&"flat_y", _builder.flat_top + TobidasuBuilder.FLAT_EPS * (2.0 + 0.15 * order))
+		order += 1
 		mi.material_override = m
 		_cards_root.add_child(mi)
 		_cards[s.get_instance_id()] = [mi, m, NAN, s]
